@@ -1,0 +1,308 @@
+#!/bin/bash
+
+## Debian 8.5 Server Minimal ssh and systemtools installation
+## See https://help.nextcloud.com/t/complete-nc-installation-on-debian-with-spreed-me-and-turn-step-by-step/2436
+## And http://www.i-erik.nl/install-guide-nextcloud-on-debian-8-with-spreed-me/
+## Script by Sys0p3r
+## Script v0.1
+## Complete install script NextCloud with Spreed.me
+## - Still got a misconfiguration when entering a room. 
+## - Error please sign in ....
+
+apt-get update
+apt-get -y upgrade
+apt-get -y install vim 
+apt-get -y install unzip 
+apt-get -y install sudo
+apt-get -y install apache2 mariadb-server libapache2-mod-php5
+apt-get -y install php5-gd php5-json php5-mysql php5-curl php5-intl php5-mcrypt php5-imagick git node.js make automake
+
+clear
+echo "#####################################################"
+echo "Please enter your host and domain name or IP address:"
+echo "#####################################################"
+read nc_svr_ip
+if [ -e /etc/apache2/sites-available/nextcloud.conf ]; then
+	echo "File /etc/apache2/sites-available/nextcloud.conf already exists!"
+else
+cat >/etc/apache2/sites-available/nextcloud.conf <<EOL
+<IfModule mod_ssl.c>
+<VirtualHost *:80>
+   ServerName $nc_svr_ip
+   Redirect permanent / https://$nc_svr_ip
+</VirtualHost>
+
+<VirtualHost *:443>
+DocumentRoot "/var/www/nextcloud"
+
+  ServerName $nc_svr_ip
+
+ErrorLog ${APACHE_LOG_DIR}/error.log
+CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+<Directory /var/www/nextcloud/>
+ Options +FollowSymlinks
+ AllowOverride All
+
+ SetEnv HOME /var/www/nextcloud
+ SetEnv HTTP_HOME /var/www/nextcloud
+ Satisfy Any
+
+</Directory>
+
+SSLEngine on
+SSLCertificateFile /etc/apache2/ssl/apache.pem
+SSLCertificateKeyFile /etc/apache2/ssl/apache.key
+
+<IfModule mod_headers.c>
+Header always set Strict-Transport-Security "max-age=15768000; includeSubDomains; preload"
+</IfModule>
+
+<Location /webrtc>
+        ProxyPass http://127.0.0.1:8888/webrtc
+        ProxyPassReverse /webrtc
+    </Location>
+
+    <Location /webrtc/ws>
+        ProxyPass ws://127.0.0.1:8888/webrtc/ws
+    </Location>
+
+    ProxyVia On
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto 'https' env=HTTPS
+
+</VirtualHost>
+</IfModule>
+EOL
+fi 
+
+if [ -e /root/nc_permis.sh ]; then
+	echo "File /root/nc_permis.sh already exists!"
+else
+cat >/root/nc_permis.sh <<EOL
+#!/bin/bash
+
+printf "Creating possible missing Directories\n"
+mkdir -p /var/www/nextcloud/data
+mkdir -p /var/www/nextcloud/assets
+mkdir -p /var/www/nextcloud/updater
+
+printf "chmod Files and Directories\n"
+find /var/www/nextcloud -type f -print0 | xargs -0 chmod 0640
+find /var/www/nextcloud -type d -print0 | xargs -0 chmod 0750
+
+printf "chown Directories\n"
+chown -R root:www-data /var/www/nextcloud
+chown -R root:www-data /var/ncdata
+chown -R www-data:www-data /var/www/nextcloud/apps/
+chown www-data:www-data /var/www/nextcloud/assets/
+chown -R www-data:www-data /var/www/nextcloud/config/
+chown -R www-data:www-data /var/www/nextcloud/
+chown -R www-data:www-data /var/www/nextcloud/themes/
+chown -R www-data:www-data /var/www/nextcloud/updater/
+
+chmod +x /var/www/nextcloud/occ
+
+printf "chmod/chown .htaccess\n"
+if [ -f /var/www/nextcloud/.htaccess ]
+then
+chmod 0644 /var/www/nextcloud/.htaccess
+chown root:www-data /var/www/nextcloud/.htaccess
+fi
+if [ -f /var/nc_data/.htaccess ]
+then
+chmod 0644 /var/nc_data/.htaccess
+chown root:www-data /var/www/nextcloud/.htaccess
+fi
+######### END SCRIPT#########
+EOL
+fi
+
+chmod 750 /root/nc_permis.sh
+
+wget https://download.nextcloud.com/server/releases/nextcloud-11.0.0.zip
+unzip nextcloud-11.0.0.zip
+mv nextcloud/ /var/www
+mkdir /var/wwww/nextcloud/config
+
+cd /var/www/nextcloud
+chown www-data:www-data . -R
+
+a2enmod ssl
+a2ensite default-ssl
+
+mkdir /etc/apache2/ssl
+cd /etc/apache2/ssl
+clear
+	echo "#####################################################"
+	echo "## Just enter trough all the certificate questions ##"
+	echo "## Or fill in your true details. Works anyway.     ##"
+	echo "#####################################################"
+	read
+openssl req -new -x509 -days 365 -nodes -out /etc/apache2/ssl/apache.pem -keyout /etc/apache2/ssl/apache.key
+chmod 600 /etc/apache2/ssl/apache.*
+
+ln -s /etc/apache2/sites-available/nextcloud.conf /etc/apache2/sites-enabled/nextcloud.conf
+
+service apache2 restart
+
+a2enmod rewrite
+a2enmod headers
+a2enmod env
+a2enmod dir
+a2enmod mime
+a2enmod ssl
+a2ensite default-ssl
+a2enmod proxy proxy_http proxy_wstunnel
+a2enmod setenvif
+
+cd /var/www/nextcloud
+clear
+	echo "Please enter your MySQL root password"
+	read db_root
+	echo "Please enter a password for MySQL database nextcloud"
+	read db_nc
+	echo "Now enter a password for your Nextcloud admin user"
+	read nc_adm
+sudo -u www-data php occ maintenance:install --database "mysql" --database-name "nextcloud" --database-user "root" --database-pass $db_root --admin-user "admin" --admin-pass $nc_adm
+		
+/root/nc_permis.sh		
+
+cd /root
+wget https://storage.googleapis.com/golang/go1.7.linux-amd64.tar.gz
+tar xzvf go1.7.linux-amd64.tar.gz
+mv go/ /usr/local
+
+
+sed -i 's/_var_www_nextcloud_data/var_ncdata/g' /var/www/nextcloud/config/config.php
+
+sed -i /'mesg n/i \
+export PATH=$PATH:/usr/local/go/bin' /root/.profile
+. ~/.profile
+
+clear
+echo "############################################################"
+echo "# Now copy and add the next line to your config.php        #"
+echo "# Add line directly under the line 0 => 'localhost',       #"
+echo "#                                                          #"
+echo "############################################################"
+echo ""
+echo "1 => '$nc_svr_ip',"
+echo "### ADD DIRECTLY BELOW LINE 0 => 'localhost',"
+echo ""
+echo "Copy line and press any key to open config.php"
+read pause3
+vi /var/www/nextcloud/config/config.php
+
+cd /var/www
+wget https://github.com/strukturag/spreed-webrtc/archive/master.zip
+unzip master.zip
+rm master.zip
+
+cd spreed-webrtc-master
+./autogen.sh
+./configure
+make
+
+sSecret=$(openssl rand -hex 32)
+
+echo "Your random sessionSecret is"
+echo "$sSecret"
+
+if [ -e /var/www/spreed-webrtc-master/server.conf ]; then
+	echo "File /var/www/spreed-webrtc-master/server.conf already exists!"
+else
+cat >/var/www/spreed-webrtc-master/server.conf <<EOL
+[http]
+listen = 127.0.0.1:8888
+basePath = /webrtc/
+[https]
+[app]
+sessionSecret = $sSecret
+encryptionSecret = $sSecret
+authorizeRoomJoin = true
+authorizeRoomCreation = true
+serverToken = i-did-not-change-the-public-token-boo
+serverRealm = local
+extra = /var/www/nextcloud/apps/spreedme/extra
+plugin = extra/static/owncloud.js
+[modules]
+[log]
+[users]
+enabled = true
+allowRegistration = true
+mode = sharedsecret
+sharedsecret: $sSecret
+[nats]
+[roomtypes]
+EOL
+fi
+
+wget https://github.com/strukturag/nextcloud-spreedme/archive/master.zip
+unzip master.zip
+mv nextcloud-spreedme-master /var/www/nextcloud/apps/spreedme
+rm master.zip
+
+if [ -e /var/www/nextcloud/apps/spreedme/config/config.php ]; then
+	echo "File /var/www/nextcloud/apps/spreedme/config/config.php already exists!"
+else
+cat >/var/www/nextcloud/apps/spreedme/config/config.php <<EOL
+<?php
+/**
+ * Nextcloud - spreedme
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Leon <leon@struktur.de>
+ * @copyright struktur AG 2016
+ */
+
+namespace OCA\SpreedME\Config;
+
+class Config {
+
+        // Domain of your Spreed WebRTC server (including protocol and optional port number), examples:
+        //const SPREED_WEBRTC_ORIGIN = 'https://mynextcloudserver.com';
+        //const SPREED_WEBRTC_ORIGIN = 'https://webrtc.mynextcloudserver.com:8080';
+        // If this is empty or only includes a port (e.g. :8080), host will automatically be determined (current host)
+        const SPREED_WEBRTC_ORIGIN = '';
+
+        // This has to be the same `basePath`
+        // you already set in the [http] section of the `server.conf` file from Spreed WebRTC server
+        const SPREED_WEBRTC_BASEPATH = '/webrtc/';
+
+        // This has to be the same `sharedsecret_secret` (64-character HEX string)
+        // you already set in the [users] section of the `server.conf` file from Spreed WebRTC server
+        const SPREED_WEBRTC_SHAREDSECRET = '$sSecret';
+
+        // Set to true if at least one another Nextcloud instance uses the same Spreed WebRTC server
+        const SPREED_WEBRTC_IS_SHARED_INSTANCE = false;
+
+        // Set to true if you want to allow access to this app + spreed-webrtc for non-registered users who received a temporary password by an Nextcloud admin.
+        // You can generate such a temporary password at: /index.php/apps/spreedme/admin/tp (Nextcloud admin user account required)
+        const OWNCLOUD_TEMPORARY_PASSWORD_LOGIN_ENABLED = false;
+
+        // If 'OWNCLOUD_TEMPORARY_PASSWORD_LOGIN_ENABLED' is set to true, you also have to provide a signing key here (64-character HEX string)
+        // Generate it using `xxd -ps -l 32 -c 32 /dev/random` (better) or `openssl rand -hex 32`
+        const OWNCLOUD_TEMPORARY_PASSWORD_SIGNING_KEY = '$sSecret';
+
+        private function __construct() {
+
+        }
+
+}
+EOL
+fi
+
+service apache2 restart
+
+cp /var/www/nextcloud/apps/spreedme/extra/static/config/OwnCloudConfig.js.in /var/www/nextcloud/apps/spreedme/extra/static/config/OwnCloudConfig.js
+
+cd /var/www/spreed-webrtc-master/
+nohup ./spreed-webrtc-server > /dev/null 2>&1 &
+
+clear
+echo "After a server reboot spreed wont start automaticly"
+echo "Use the following command to let it run in de background"
+echo "nohup ./spreed-webrtc-server > /dev/null 2>&1 &"

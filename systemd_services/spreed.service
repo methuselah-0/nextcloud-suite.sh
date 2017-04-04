@@ -1,0 +1,25 @@
+[Unit]
+Description=Spreed WebRTC server
+After=network.target
+ConditionFileIsExecutable=/opt/spreed/spreed-webrtc-server
+ConditionPathIsReadWrite=/etc/default/spreed
+ConditionPathIsReadWrite=/var/www/mydomain.tld/nextcloud/apps/spreedme/extra
+
+[Service]
+Type=simple
+UMask=022
+EnvironmentFile=-/etc/default/spreed
+# TODO: These values should come from the EnvironmentFile.
+Environment=GOMAXPROCS=1
+LimitNOFILE=1024
+User=spreed
+Group=www-data
+PermissionsStartOnly=true
+WorkingDirectory=/opt/spreed
+#ExecStart=spreed-webrtc-server -c ${WEBRTC_CONF} -l ${WEBRTC_LOG}
+ExecStart=/opt/spreed/bin/spreed-webrtc-server -c /opt/spreed/server.conf -l /var/log/spreed.log
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+	

@@ -1,0 +1,9 @@
+# File I'll likely delete
+#test-script
+# Ignore all .html files, except 'important.html'
+#*.html
+!important.html
+# Ignore all txt backup files
+*~
+# Ignore all files recursively in 'DoNotInclude'
+#DoNotInclude/**
