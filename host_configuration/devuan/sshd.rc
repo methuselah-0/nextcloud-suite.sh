@@ -1,0 +1,26 @@
+#!/sbin/openrc-run
+command=/usr/bin/sshd
+pidfile=/run/sshd.pid
+#command_args="-f /etc/ssh/sshd_config"
+name="SSH Server Daemon"
+declare -a required_files=( /etc/ssh/sshd_config )
+
+depend()
+{
+	need net
+	use logger dns
+}
+start() {
+        for file in "${required_files[@]}" ; do
+	    test -f $file || printf '%s' "$file does not exist and is required" && exit 1
+	done
+	ebegin "Starting sshd"
+	start-stop-daemon --start $command --quiet --pidfile "$pidfile"
+	eend $?
+}
+stop() {
+       ebegin "Stopping sshd"
+       start-stop-daemon --stop "$command" --quiet --pidfile $pidfile --retry SIGTERM/10
+       eend $?
+}
+       

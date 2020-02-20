@@ -1,0 +1,31 @@
+#!/bin/sh 
+# 
+# Script to bring down and delete bridge br0 when QEMU exits 
+# 
+# Bring down eth0 and br0 
+#
+#sudo netctl stop wlp2s0-libreCMC
+#ifdown br0
+_BRIDGE=$(grep BRIDGE /tmp/"$1".pid | awk '{ print $2 }')
+ifconfig $_BRIDGE down
+#sudo ip link set br0 down
+# 
+# Delete the bridge
+#
+brctl delbr $_BRIDGE
+# 
+# bring up eth0 in "normal" mode 
+#
+#sudo ifconfig wlp2s0 -promisc
+#ifup wlp2s0
+#sudo netctl start wlp2s0-libreCMC
+#
+# delete the tap device
+#
+_TAP=$(grep TAP /tmp/"$1".pid | awk '{ print $2 }')
+ifconfig $_TAP down
+openvpn --rmtun --dev $_TAP
+#
+# start firewall again
+# 
+#service firestarter start 

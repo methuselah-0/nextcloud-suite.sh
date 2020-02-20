@@ -18,6 +18,8 @@
 # along with Nextcloud-Suite.sh.  If not, see
 # <http://www.gnu.org/licenses/>.
 
+#  For sysinfo: https://bash.cyberciti.biz/guide/Getting_information_about_your_system
+
 sdomain="cloud"
 mydomain="domain.tld"
 nc="/var/www/$mydomain/nextcloud"
@@ -287,7 +289,7 @@ Description=Spreed WebRTC server
 After=network.target
 ConditionFileIsExecutable=/opt/spreed/spreed-webrtc-server
 ConditionPathIsReadWrite=/etc/default/spreed
-ConditionPathIsReadWrite=/var/www/selfhosted/nextcloud/apps/spreedme/extra
+ConditionPathIsReadWrite=/var/www/mydomain.tld/nextcloud/apps/spreedme/extra
 
 [Service]
 Type=simple
@@ -336,7 +338,6 @@ EOF
 # Section ref1: https://github.com/coturn/coturn
 # Section ref2: Ecphrasis comments
 # https://help.nextcloud.com/t/complete-nc-installation-on-debian-with-spreed-me-and-turn-step-by-step/2436/38
-
 
 #
 # Install software
@@ -539,3 +540,7 @@ EOF
 # Requires registration for API access: http://openweathermap.org/price
 # install just by enabling. https://github.com/nextcloud/weather
 
+# news updater installation
+# apt-get install python3-pip
+# pip3 install nextcloud_news_updater --install-option="--install-scripts=/usr/bin"
+# to crontab: "*/15 * * * * sudo -u www-data nextcloud-news-updater /var/www/example.com/nextcloud --mode singlerun &

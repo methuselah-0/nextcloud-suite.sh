@@ -5,5 +5,6 @@
 !important.html
 # Ignore all txt backup files
 *~
+\#*#
 # Ignore all files recursively in 'DoNotInclude'
 #DoNotInclude/**
